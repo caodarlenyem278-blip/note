@@ -580,14 +580,25 @@ if (backBtn) {
 // ====== PWA Install ======
 var deferredPrompt = null;
 var installBtn = document.getElementById('installBtn');
+var pwaReady = false;
+
+// 等SW控制页面后才认为PWA可安装
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(function() {
+        pwaReady = true;
+        console.log('PWA ready: SW is controlling page');
+    });
+}
 
 window.addEventListener('beforeinstallprompt', function(e) {
-    console.log('beforeinstallprompt fired');
-    e.preventDefault();
+    console.log('beforeinstallprompt fired - PWA installable!');
+    // 不调用preventDefault()，让Chrome同时显示原生安装提示(mini-infobar)
+    // 但仍然保存事件用于自定义按钮
     deferredPrompt = e;
     if (installBtn) {
         installBtn.style.display = 'inline-flex';
-        installBtn.textContent = '📥 安装应用';
+        installBtn.textContent = '📥 安装到桌面';
+        installBtn.classList.add('install-ready');
     }
 });
 
@@ -600,24 +611,27 @@ window.addEventListener('appinstalled', function() {
 
 function installPWA() {
     if (deferredPrompt) {
+        // 调用系统安装对话框，会弹出"安装/取消"的底部弹窗
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then(function(choiceResult) {
             if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted install');
                 showToast('正在安装小本本...');
             } else {
-                showToast('您取消了安装，可随时通过浏览器菜单安装');
+                console.log('User dismissed install');
+                showToast('您取消了安装，可随时点击此按钮或通过浏览器菜单安装');
             }
             deferredPrompt = null;
         });
         return;
     }
-    // 如果deferredPrompt不可用，显示手动安装引导
+    // 如果deferredPrompt不可用，分平台给出引导
     var ua = navigator.userAgent;
     var isAndroid = /Android/i.test(ua);
     var isIOS = /iPhone|iPad|iPod/i.test(ua);
     var isChrome = /Chrome/i.test(ua) && !/Edg|OPR|Brave/i.test(ua);
     if (isAndroid && isChrome) {
-        showToast('请点击浏览器右上角 ⋮ 菜单，选择「安装应用」或「添加到主屏幕」');
+        showToast('请点击浏览器右上角 ⋮ 菜单，选择「安装应用」（在菜单顶部）');
     } else if (isIOS) {
         showToast('请点击Safari底部分享按钮 ⬆️，选择「添加到主屏幕」');
     } else {
@@ -625,19 +639,28 @@ function installPWA() {
     }
 }
 
-// 页面加载完成后，如果3秒内还没收到beforeinstallprompt，显示手动安装按钮
-setTimeout(function() {
-    if (!deferredPrompt && installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
-        // 检查是否已经安装
-        if (window.matchMedia('(display-mode: standalone)').matches) return;
-        // 检查是否在可安装的浏览器中
-        var isInstallableBrowser = /Chrome|Edg|Firefox|SamsungBrowser/i.test(navigator.userAgent) && !/iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isInstallableBrowser) {
-            installBtn.style.display = 'inline-flex';
-            installBtn.textContent = '📱 添加到桌面';
-        }
-    }
-}, 3000);
+// 页面加载后，如果在standalone模式（已安装），隐藏按钮；否则等待beforeinstallprompt
+if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+    if (installBtn) installBtn.style.display = 'none';
+} else {
+    // 用户首次交互后再检查，Chrome需要用户手势
+    var interacted = false;
+    var onInteract = function() {
+        if (interacted) return;
+        interacted = true;
+        // 如果3秒后还没收到beforeinstallprompt，显示引导按钮
+        setTimeout(function() {
+            if (!deferredPrompt && installBtn && installBtn.style.display === 'none') {
+                installBtn.style.display = 'inline-flex';
+                installBtn.textContent = '📱 添加到桌面';
+                installBtn.classList.remove('install-ready');
+            }
+        }, 5000);
+    };
+    window.addEventListener('click', onInteract, { once: true });
+    window.addEventListener('touchstart', onInteract, { once: true });
+    window.addEventListener('scroll', onInteract, { once: true });
+}
 
 // ====== Init ======
 updatePriorityDot();

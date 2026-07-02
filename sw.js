@@ -1,16 +1,16 @@
-// 小本本 Service Worker – PWA 离线缓存 v17 (maskable safe zone icons)
-const CACHE = "xiaobenben-v17";
+// 小本本 Service Worker – PWA 离线缓存 v18 (fixed install flow)
+const CACHE = "xiaobenben-v18";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=17",
-  "./app.js?v=17",
-  "./sync.js?v=17",
-  "./manifest.json",
-  "./icon-192.png?v=17",
-  "./icon-512.png?v=17",
-  "./icon-maskable-192.png?v=17",
-  "./icon-maskable-512.png?v=17"
+  "./style.css?v=18",
+  "./app.js?v=18",
+  "./sync.js?v=18",
+  "./manifest.json?v=18",
+  "./icon-192.png?v=18",
+  "./icon-512.png?v=18",
+  "./icon-maskable-192.png?v=18",
+  "./icon-maskable-512.png?v=18"
 ];
 
 self.addEventListener("install", function(e) {
@@ -44,8 +44,8 @@ self.addEventListener("fetch", function(e) {
   if (url.pathname.indexOf("/rest/v1/") !== -1) return;
   if (url.origin !== self.location.origin) return;
 
-  var hasVersion = url.search.indexOf("v=") !== -1;
-  if (hasVersion) {
+  // Network-first for versioned resources
+  if (url.search.indexOf("v=") !== -1) {
     e.respondWith(
       fetch(e.request).then(function(response) {
         if (response && response.status === 200) {
