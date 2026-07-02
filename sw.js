@@ -1,11 +1,11 @@
-// 小本本 Service Worker – PWA 离线缓存 v14
-const CACHE = "xiaobenben-v14";
+// 小本本 Service Worker – PWA 离线缓存 v15
+const CACHE = "xiaobenben-v15";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=14",
-  "./app.js?v=14",
-  "./sync.js?v=14",
+  "./style.css?v=15",
+  "./app.js?v=15",
+  "./sync.js?v=15",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
@@ -15,11 +15,8 @@ self.addEventListener("install", function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
       return cache.addAll(SHELL).catch(function(err) {
-        console.log("Cache addAll error:", err);
         return Promise.all(SHELL.map(function(url) {
-          return cache.add(url).catch(function(e) {
-            console.log("Failed to cache:", url);
-          });
+          return cache.add(url).catch(function() {});
         }));
       });
     })
