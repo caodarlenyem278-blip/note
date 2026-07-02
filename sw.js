@@ -6,9 +6,9 @@ const SHELL = [
   "./style.css?v=13",
   "./app.js?v=13",
   "./sync.js?v=13",
-  "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png"
+  "./manifest.json?v=13",
+  "./icon-192.png?v=13",
+  "./icon-512.png?v=13"
 ];
 
 self.addEventListener("install", function(e) {
