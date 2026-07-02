@@ -1,11 +1,11 @@
-// 小本本 Service Worker – PWA 离线缓存 v12
-const CACHE = "xiaobenben-v12";
+// 小本本 Service Worker – PWA 离线缓存 v13
+const CACHE = "xiaobenben-v13";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=12",
-  "./app.js?v=12",
-  "./sync.js?v=12",
+  "./style.css?v=13",
+  "./app.js?v=13",
+  "./sync.js?v=13",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
