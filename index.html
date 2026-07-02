@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>小本本 · 我的日常</title>
+    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="manifest" href="manifest.json?v=5">
+    <meta name="theme-color" content="#f59e0b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="小本本">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=5">
+    <link rel="apple-touch-icon" href="icon-192.png?v=5">
+    <style>
+        .loading .header-content h1, .loading .header-content .subtitle, .loading .search-bar-wrap { opacity: 0; }
+    </style>
+    <script>document.documentElement.classList.add('loading')</script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-bg">
+            <svg class="landscape-svg" viewBox='0 0 1200 280' preserveAspectRatio='xMidYMid slice'>
+                <defs>
+                    <linearGradient id='skyGrad' x1='0' y1='0' x2='0' y2='1'>
+                        <stop offset='0%' stop-color='#87CEEB'/>
+                        <stop offset='40%' stop-color='#FDB99B'/>
+                        <stop offset='70%' stop-color='#FCE4B3'/>
+                        <stop offset='100%' stop-color='#E8F5E9'/>
+                    </linearGradient>
+                    <linearGradient id='mountain1' x1='0' y1='0' x2='0' y2='1'>
+                        <stop offset='0%' stop-color='#A5D6A7'/>
+                        <stop offset='100%' stop-color='#66BB6A'/>
+                    </linearGradient>
+                    <linearGradient id='mountain2' x1='0' y1='0' x2='0' y2='1'>
+                        <stop offset='0%' stop-color='#81C784'/>
+                        <stop offset='100%' stop-color='#43A047'/>
+                    </linearGradient>
+                    <linearGradient id='hillFront' x1='0' y1='0' x2='0' y2='1'>
+                        <stop offset='0%' stop-color='#66BB6A'/>
+                        <stop offset='100%' stop-color='#388E3C'/>
+                    </linearGradient>
+                    <radialGradient id='sunGlow' cx='50%' cy='50%' r='50%'>
+                        <stop offset='0%' stop-color='#FFF9C4' stop-opacity='1'/>
+                        <stop offset='40%' stop-color='#FFE082' stop-opacity='0.6'/>
+                        <stop offset='100%' stop-color='#FFE082' stop-opacity='0'/>
+                    </radialGradient>
+                    <filter id='cloudBlur'>
+                        <feGaussianBlur stdDeviation='3'/>
+                    </filter>
+                </defs>
+                <rect width='1200' height='280' fill='url(#skyGrad)'/>
+                <circle cx='850' cy='110' r='80' fill='url(#sunGlow)'/>
+                <circle cx='850' cy='110' r='36' fill='#FFF9C4'/>
+                <path d='M0 380 L1200 380 L1200 400 L0 400 Z' fill='#2E7D32'/>
+                <g filter='url(#cloudBlur)' opacity='0.7'>
+                    <ellipse cx='200' cy='80' rx='100' ry='30' fill='white'/>
+                    <ellipse cx='260' cy='75' rx='80' ry='25' fill='white'/>
+                    <ellipse cx='160' cy='70' rx='60' ry='20' fill='white'/>
+                    <ellipse cx='900' cy='60' rx='90' ry='25' fill='white'/>
+                    <ellipse cx='960' cy='55' rx='70' ry='20' fill='white'/>
+                    <ellipse cx='1000' cy='65' rx='50' ry='18' fill='white'/>
+                </g>
+                <path d='M-50 196 L100 126 L250 182 L350 119 L500 175 L600 112 L750 168 L850 91 L1000 154 L1100 105 L1250 175 L1250 280 L-50 280 Z' fill='url(#mountain1)' opacity='0.8'/>
+                <path d='M-50 224 L150 161 L300 210 L400 147 L550 203 L700 140 L800 196 L950 133 L1050 182 L1150 140 L1250 196 L1250 280 L-50 280 Z' fill='url(#mountain2)' opacity='0.6'/>
+                <path d='M-50 280 Q100 217 250 252 Q400 224 550 259 Q700 231 850 252 Q1000 224 1150 259 Q1220 245 1250 266 L1250 400 Z' fill='url(#hillFront)'/>
+                <path d='M-50 280 Q200 245 400 266 Q550 252 700 273 Q850 259 1000 269 Q1150 255 1250 273 L1250 400 Z' fill='#2E7D32'/>
+            </svg>
+        </div>
+        <div class="header-content">
+            <h1>📒</h1>
+            <p class="subtitle">记下生活中的大小事</p>
+        </div>
+    </header>
+    <main class="main">
+        <!-- 搜索栏 -->
+        <div class="search-bar-wrap">
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="搜索日记、待办、已完成...">
+                <button class="search-clear" id="searchClear" style="display:none">✕</button>
+            </div>
+        </div>
+
+        <nav class="tabs">
+            <button class="tab active" data-tab="journal">
+                <span class="tab-icon">✏️</span>
+                <span class="tab-label">日常记录</span>
+            </button>
+            <button class="tab" data-tab="todo">
+                <span class="tab-icon">✅</span>
+                <span class="tab-label">待办事项</span>
+                <span class="badge" id="todoBadge">0</span>
+            </button>
+            <button class="tab" data-tab="done">
+                <span class="tab-icon">🎉</span>
+                <span class="tab-label">已完成</span>
+                <span class="badge" id="doneBadge">0</span>
+            </button>
+            <button class="tab" data-tab="diet">
+                <span class="tab-icon">🍽️</span>
+                <span class="tab-label">饮食记录</span>
+            </button>
+        </nav>
+
+        <div id="confirmOverlay" class="confirm-overlay">
+            <div class="confirm-dialog">
+                <p id="confirmMsg">确定要删除吗？</p>
+                <div class="confirm-buttons">
+                    <button id="confirmCancel" class="btn btn-secondary">取消</button>
+                    <button id="confirmOk" class="btn btn-danger">删除</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="searchResults" class="search-results" style="display:none"></div>
+
+        <section class="panel active" id="journalPanel">
+            <div class="input-card">
+                <textarea id="journalInput" placeholder="今天发生了什么？写下你的心情..." rows="4"></textarea>
+                <button id="journalBtn" class="btn btn-primary">记录今天 💾</button>
+            </div>
+            <div class="entries" id="journalEntries"></div>
+        </section>
+
+        <section class="panel" id="todoPanel">
+            <div class="input-card">
+                <div class="todo-input-row">
+                    <div class="todo-input-wrapper">
+                        <button class="priority-single-dot" id="priorityDot" title="中优先级（点击切换）"></button>
+                        <input type="hidden" id="todoPriority" value="medium">
+                        <input type="text" id="todoInput" placeholder="有什么事情要做？">
+                    </div>
+                    <button id="todoBtn" class="btn btn-primary">添加 ✚</button>
+                </div>
+            </div>
+            <div class="entries" id="todoEntries"></div>
+        </section>
+
+        <section class="panel" id="donePanel">
+            <div class="done-header">
+                <p class="done-subtitle">继续加油！你已经完成了不少事情 🌟</p>
+            </div>
+            <div class="entries" id="doneEntries"></div>
+        </section>
+
+        <section class="panel" id="dietPanel">
+            <div class="diet-summary-card">
+                <div class="diet-target-row">
+                    <span>每日目标</span>
+                    <input type="number" id="dietTargetInput" value="2000" min="0" step="100">
+                    <span>kcal</span>
+                    <button id="dietTargetBtn" class="btn btn-accent">设置</button>
+                </div>
+                <div class="diet-month-nav">
+                    <button class="date-btn" id="dietPrevMonth">‹</button>
+                    <span id="dietMonthLabel">2026年7月</span>
+                    <button class="date-btn" id="dietNextMonth">›</button>
+                </div>
+                <div id="dietMonthSummary" class="diet-month-summary"></div>
+            </div>
+            <div class="input-card">
+                <div class="diet-cal-grid" id="dietCalGrid"></div>
+            </div>
+            <div class="diet-summary-card" id="dietDayDetail" style="display:none"></div>
+        </section>
+
+        <section class="panel" id="syncPanel">
+            <div class="input-card">
+                <h3 class="section-title">⚡ 跨设备同步</h3>
+                <p class="section-desc">手机和电脑使用相同的 Supabase URL、Anon Key 和令牌即可实时同步</p>
+                <div id="syncForm">
+                    <div class="form-group">
+                        <label>Supabase 项目 URL</label>
+                        <input type="text" id="syncUrl" placeholder="从 supabase.com 应用设置中获取">
+                    </div>
+                    <div class="form-group">
+                        <label>Supabase anon key</label>
+                        <input type="text" id="syncAnonKey" placeholder="your anon/public key">
+                    </div>
+                    <div class="form-group">
+                        <label>同步令牌（自定义口令）</label>
+                        <input type="text" id="syncToken" placeholder="自定义口令，两台设备填入相同内容">
+                    </div>
+                    <div class="form-buttons">
+                        <button id="syncConnectBtn" class="btn btn-primary">连接</button>
+                        <button id="syncDisconnectBtn" class="btn btn-secondary">断开</button>
+                    </div>
+                    <div id="syncStatus" class="sync-status">
+                        ⚪ 未连接
+                    </div>
+                </div>
+            </div>
+            <div class="input-card setup-guide">
+                <div class="setup-toggle" onclick="toggleSetupGuide()">
+                    <span>📖 首次使用设置步骤</span>
+                    <span id="setupArrow">▶</span>
+                </div>
+                <div id="setupContent" style="display:none">
+                    <p>1. 打开 <a href="https://supabase.com" target="_blank">supabase.com</a>，注册账号，创建项目</p>
+                    <p>2. 在项目 Settings → API 中获取 Project URL 和 anon/public key</p>
+                    <p>3. 在项目 SQL Editor 中运行下方 SQL 创建数据表</p>
+                    <p>4. 在本页面填入上述信息和你自定义的令牌，点击「连接」</p>
+                    <p>5. 手机和电脑都用相同令牌连接后，数据自动实时同步</p>
+                    <p class="sql-hint">所需 SQL（在 Supabase SQL Editor 中运行）：</p>
+                    <pre>CREATE TABLE sync_rooms (
+  token TEXT PRIMARY KEY,
+  data JSONB DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE sync_rooms ENABLE ROW LEVEL SECURITY;
+CREATE POLICY anon_access ON sync_rooms
+  FOR ALL TO anon USING (true) WITH CHECK (true);</pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <button id="backToTop" class="back-to-top" style="display:none">↑</button>
+    <footer class="footer">
+        <p>✨ 每一天都是新的开始 ✨</p>
+    </footer>
+    <div class="bottom-actions">
+        <button id="installBtn" class="install-btn" onclick="installPWA()" style="display:none" title="安装到桌面">📥 安装应用</button>
+        <button id="syncBottomBtn" class="sync-btn-center" onclick="toggleSyncPanel()">⚡</button>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script src="sync.js?v=9"></script>
+    <script src="app.js?v=9"></script>
+    <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js?v=10")
+        .then(function(reg) {
+          console.log("SW registered:", reg.scope);
+          // 检测到新版本时自动刷新
+          reg.addEventListener('updatefound', function() {
+            var newWorker = reg.installing;
+            newWorker.addEventListener('statechange', function() {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.location.reload();
+              }
+            });
+          });
+        })
+        .catch(function(err) { console.log("SW failed:", err); });
+    }
+    </script>
+    <script>document.documentElement.classList.remove('loading')</script>
+</body>
+</html>
