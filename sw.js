@@ -1,14 +1,16 @@
-// 小本本 Service Worker – PWA 离线缓存 v16 (yellow notebook icon)
-const CACHE = "xiaobenben-v16";
+// 小本本 Service Worker – PWA 离线缓存 v17 (maskable safe zone icons)
+const CACHE = "xiaobenben-v17";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=16",
-  "./app.js?v=16",
-  "./sync.js?v=16",
+  "./style.css?v=17",
+  "./app.js?v=17",
+  "./sync.js?v=17",
   "./manifest.json",
-  "./icon-192.png?v=16",
-  "./icon-512.png?v=16"
+  "./icon-192.png?v=17",
+  "./icon-512.png?v=17",
+  "./icon-maskable-192.png?v=17",
+  "./icon-maskable-512.png?v=17"
 ];
 
 self.addEventListener("install", function(e) {
