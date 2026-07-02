@@ -1,20 +1,20 @@
-// 小本本 Service Worker – PWA 离线缓存 v15
-const CACHE = "xiaobenben-v15";
+// 小本本 Service Worker – PWA 离线缓存 v16 (yellow notebook icon)
+const CACHE = "xiaobenben-v16";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=15",
-  "./app.js?v=15",
-  "./sync.js?v=15",
+  "./style.css?v=16",
+  "./app.js?v=16",
+  "./sync.js?v=16",
   "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png"
+  "./icon-192.png?v=16",
+  "./icon-512.png?v=16"
 ];
 
 self.addEventListener("install", function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
-      return cache.addAll(SHELL).catch(function(err) {
+      return cache.addAll(SHELL).catch(function() {
         return Promise.all(SHELL.map(function(url) {
           return cache.add(url).catch(function() {});
         }));
@@ -31,9 +31,7 @@ self.addEventListener("activate", function(e) {
         keys.filter(function(k) { return k !== CACHE; })
             .map(function(k) { return caches.delete(k); })
       );
-    }).then(function() {
-      return self.clients.claim();
-    })
+    }).then(function() { return self.clients.claim(); })
   );
 });
 
@@ -45,20 +43,15 @@ self.addEventListener("fetch", function(e) {
   if (url.origin !== self.location.origin) return;
 
   var hasVersion = url.search.indexOf("v=") !== -1;
-
   if (hasVersion) {
     e.respondWith(
       fetch(e.request).then(function(response) {
         if (response && response.status === 200) {
           var clone = response.clone();
-          caches.open(CACHE).then(function(cache) {
-            cache.put(e.request, clone);
-          });
+          caches.open(CACHE).then(function(cache) { cache.put(e.request, clone); });
         }
         return response;
-      }).catch(function() {
-        return caches.match(e.request);
-      })
+      }).catch(function() { return caches.match(e.request); })
     );
     return;
   }
@@ -67,16 +60,14 @@ self.addEventListener("fetch", function(e) {
   if (isStatic) {
     e.respondWith(
       caches.match(e.request).then(function(cached) {
-        var fetchPromise = fetch(e.request).then(function(response) {
+        var fp = fetch(e.request).then(function(response) {
           if (response && response.status === 200) {
             var clone = response.clone();
-            caches.open(CACHE).then(function(cache) {
-              cache.put(e.request, clone);
-            });
+            caches.open(CACHE).then(function(cache) { cache.put(e.request, clone); });
           }
           return response;
         }).catch(function() { return cached; });
-        return cached || fetchPromise;
+        return cached || fp;
       })
     );
     return;
@@ -87,14 +78,10 @@ self.addEventListener("fetch", function(e) {
       var fetched = fetch(e.request).then(function(response) {
         if (response && response.status === 200 && (response.type === "basic" || response.type === "cors")) {
           var clone = response.clone();
-          caches.open(CACHE).then(function(cache) {
-            cache.put(e.request, clone);
-          });
+          caches.open(CACHE).then(function(cache) { cache.put(e.request, clone); });
         }
         return response;
-      }).catch(function() {
-        return cached;
-      });
+      }).catch(function() { return cached; });
       return cached || fetched;
     })
   );
