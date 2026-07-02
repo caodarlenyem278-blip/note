@@ -2,17 +2,24 @@
   "name": "小本本 · 我的日常",
   "short_name": "小本本",
   "description": "记录日常、待办与饮食的轻量日记应用",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/note/",
+  "scope": "/note/",
   "id": "/note/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "any",
   "background_color": "#ffd400",
   "theme_color": "#ffd400",
   "lang": "zh-CN",
   "dir": "ltr",
-  "categories": ["lifestyle", "productivity"],
+  "categories": [
+    "lifestyle",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "icon-192.png?v=19",
