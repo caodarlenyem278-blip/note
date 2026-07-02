@@ -1,25 +1,24 @@
-// 小本本 Service Worker – PWA 离线缓存 v13
-const CACHE = "xiaobenben-v13";
+// 小本本 Service Worker – PWA 离线缓存 v14
+const CACHE = "xiaobenben-v14";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=13",
-  "./app.js?v=13",
-  "./sync.js?v=13",
-  "./manifest.json?v=13",
-  "./icon-192.png?v=13",
-  "./icon-512.png?v=13"
+  "./style.css?v=14",
+  "./app.js?v=14",
+  "./sync.js?v=14",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png"
 ];
 
 self.addEventListener("install", function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
       return cache.addAll(SHELL).catch(function(err) {
-        console.log("Cache addAll failed:", err);
-        // 逐个缓存，失败的跳过
+        console.log("Cache addAll error:", err);
         return Promise.all(SHELL.map(function(url) {
           return cache.add(url).catch(function(e) {
-            console.log("Failed to cache:", url, e);
+            console.log("Failed to cache:", url);
           });
         }));
       });
@@ -45,12 +44,9 @@ self.addEventListener("fetch", function(e) {
   if (e.request.method !== "GET") return;
   var url = new URL(e.request.url);
   if (url.protocol === "chrome-extension:") return;
-  // 不同步 Supabase API 请求
   if (url.pathname.indexOf("/rest/v1/") !== -1) return;
-  // 跳过跨域请求
   if (url.origin !== self.location.origin) return;
 
-  // 对版本化资源使用network-first
   var hasVersion = url.search.indexOf("v=") !== -1;
 
   if (hasVersion) {
@@ -70,7 +66,6 @@ self.addEventListener("fetch", function(e) {
     return;
   }
 
-  // 对manifest和icons使用stale-while-revalidate
   var isStatic = /\.(png|jpg|jpeg|gif|svg|webp|ico|json|webmanifest)$/.test(url.pathname);
   if (isStatic) {
     e.respondWith(
@@ -90,7 +85,6 @@ self.addEventListener("fetch", function(e) {
     return;
   }
 
-  // 默认: cache-first with network update
   e.respondWith(
     caches.match(e.request).then(function(cached) {
       var fetched = fetch(e.request).then(function(response) {
