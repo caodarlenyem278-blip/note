@@ -35,6 +35,21 @@ function updatePriorityDot() {
     }
     var hidden = document.getElementById('todoPriority');
     if (hidden) hidden.value = currentPriority;
+    // 更新输入框边框颜色跟随优先级
+    var wrapper = document.querySelector('.todo-input-wrapper');
+    if (wrapper) {
+        var lightColor = info.color + '15'; // 10% opacity for bg
+        wrapper.style.borderColor = info.color;
+        wrapper.style.boxShadow = '0 0 0 3px ' + lightColor;
+        // 更新focus样式也用对应颜色
+        var styleEl = document.getElementById('priorityDynamicStyle');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'priorityDynamicStyle';
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = '.todo-input-wrapper:focus-within { border-color: ' + info.color + ' !important; box-shadow: 0 0 0 3px ' + lightColor + ' !important; }';
+    }
 }
 
 function setPriorityUI(pri) {

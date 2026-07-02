@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
     <title>小本本 · 我的日常</title>
-    <link rel="stylesheet" href="style.css?v=18">
-    <link rel="manifest" href="manifest.json?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="manifest" href="manifest.json?v=19">
     <meta name="theme-color" content="#ffd400">
     <meta name="description" content="记录日常、待办与饮食的轻量日记应用">
     <meta name="mobile-web-app-capable" content="yes">
@@ -16,10 +16,10 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-TileColor" content="#ffd400">
     <meta name="msapplication-tap-highlight" content="no">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=18">
-    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=18">
-    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?v=18">
-    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png?v=18">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=19">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=19">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?v=19">
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png?v=19">
     <style>
         .loading .header-content h1, .loading .header-content .subtitle, .loading .search-bar-wrap { opacity: 0; }
     </style>
@@ -234,55 +234,68 @@ CREATE POLICY anon_access ON sync_rooms
     </div>
     <div class="toast" id="toast"></div>
 
-    <script src="sync.js?v=18"></script>
-    <script src="app.js?v=18"></script>
+    <script src="sync.js?v=19"></script>
+    <script src="app.js?v=19"></script>
     <script>
-    // PWA Service Worker 注册 - 简化版，确保SW立即接管页面
+    // PWA Service Worker 注册 v19 - 稳定可靠版
     (function() {
       if (!("serviceWorker" in navigator)) return;
-      var expectedScope = new URL('./', location.href).pathname;
       
-      // 清理错误scope的SW（仅清理不同scope的，不清理当前scope的）
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        var wait = [];
-        for (var i = 0; i < registrations.length; i++) {
-          var reg = registrations[i];
-          // 只清理scope不匹配的（如之前根路径/的SW）
-          if (reg.scope !== expectedScope && reg.scope !== expectedScope.replace(/\/$/, '')) {
-            console.log("Unregistering conflicting SW:", reg.scope);
-            wait.push(reg.unregister());
+      // 清理根路径/的旧SW（之前误部署的），但保留/note/下的SW
+      var noteScope = new URL('./', location.href).pathname; // e.g. "/note/"
+      var rootScope = noteScope.substring(0, noteScope.indexOf('/', 1) + 1) || "/";
+      
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        var cleanup = [];
+        for (var i = 0; i < regs.length; i++) {
+          var s = regs[i].scope;
+          // 只清理根路径的SW（scope为/或/user/repo/之外的）
+          var scopePath = s.replace(/^https?:\/\/[^/]+/, '');
+          if (scopePath === "/" || (scopePath !== noteScope && !scopePath.startsWith(noteScope))) {
+            console.log("[PWA] Removing old SW with scope:", s);
+            cleanup.push(regs[i].unregister());
           }
         }
-        return Promise.all(wait);
+        return Promise.all(cleanup);
       }).then(function() {
-        // 注册新SW
-        return navigator.serviceWorker.register("sw.js?v=18", { scope: "./" });
+        return navigator.serviceWorker.register("sw.js?v=19", { scope: "./" });
       }).then(function(reg) {
-        console.log("SW registered, scope:", reg.scope);
+        console.log("[PWA] SW registered, scope:", reg.scope);
+        console.log("[PWA] SW controller:", navigator.serviceWorker.controller ? "active" : "not yet active");
         
-        // 监听SW更新
+        // 监听SW更新 - 新版本安装后提示用户刷新
         reg.addEventListener('updatefound', function() {
-          var newWorker = reg.installing;
-          newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'installed') {
+          var nw = reg.installing;
+          nw.addEventListener('statechange', function() {
+            if (nw.state === 'installed') {
               if (navigator.serviceWorker.controller) {
-                console.log("New SW available, reloading...");
+                console.log("[PWA] New SW installed, reloading...");
                 window.location.reload();
               } else {
-                console.log("SW installed for first time");
+                console.log("[PWA] First SW install, waiting for activation...");
+                // 首次安装，等SW激活后刷新一次让其接管页面
+                nw.addEventListener('statechange', function() {
+                  if (nw.state === 'activated') {
+                    console.log("[PWA] SW activated, reloading to take control");
+                    window.location.reload();
+                  }
+                });
               }
             }
           });
         });
         
-        // 如果没有controller，说明SW首次安装，等它激活后刷新
-        if (!navigator.serviceWorker.controller) {
-          navigator.serviceWorker.ready.then(function() {
-            console.log("SW ready, reloading to take control...");
-            window.location.reload();
-          });
-        }
-      }).catch(function(err) { console.log("SW register failed:", err); });
+        // PWA可安装性诊断
+        setTimeout(function() {
+          console.log("[PWA] === Diagnostics ===");
+          console.log("[PWA] Manifest link:", !!document.querySelector('link[rel="manifest"]'));
+          console.log("[PWA] SW controller:", !!navigator.serviceWorker.controller);
+          console.log("[PWA] Display mode:", window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser tab');
+          console.log("[PWA] Protocol:", location.protocol);
+          console.log("[PWA] Ready for install:", !!navigator.serviceWorker.controller && location.protocol === 'https:');
+        }, 2000);
+        
+      }).catch(function(err) { console.log("[PWA] SW register failed:", err); });
     })();
     </script>
     <script>document.documentElement.classList.remove('loading')</script>
