@@ -579,34 +579,65 @@ if (backBtn) {
 
 // ====== PWA Install ======
 var deferredPrompt = null;
+var installBtn = document.getElementById('installBtn');
+
 window.addEventListener('beforeinstallprompt', function(e) {
+    console.log('beforeinstallprompt fired');
     e.preventDefault();
     deferredPrompt = e;
-    var installBtn = document.getElementById('installBtn');
-    if (installBtn) installBtn.style.display = 'inline-flex';
+    if (installBtn) {
+        installBtn.style.display = 'inline-flex';
+        installBtn.textContent = '📥 安装应用';
+    }
+});
+
+window.addEventListener('appinstalled', function() {
+    console.log('PWA installed successfully');
+    showToast('小本本已安装成功 🎉 可在桌面找到图标');
+    if (installBtn) installBtn.style.display = 'none';
+    deferredPrompt = null;
 });
 
 function installPWA() {
-    if (!deferredPrompt) {
-        showToast('请使用浏览器菜单中的「安装应用」选项');
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function(choiceResult) {
+            if (choiceResult.outcome === 'accepted') {
+                showToast('正在安装小本本...');
+            } else {
+                showToast('您取消了安装，可随时通过浏览器菜单安装');
+            }
+            deferredPrompt = null;
+        });
         return;
     }
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function(choiceResult) {
-        if (choiceResult.outcome === 'accepted') {
-            showToast('正在安装小本本...');
-        }
-        deferredPrompt = null;
-        var installBtn = document.getElementById('installBtn');
-        if (installBtn) installBtn.style.display = 'none';
-    });
+    // 如果deferredPrompt不可用，显示手动安装引导
+    var ua = navigator.userAgent;
+    var isAndroid = /Android/i.test(ua);
+    var isIOS = /iPhone|iPad|iPod/i.test(ua);
+    var isChrome = /Chrome/i.test(ua) && !/Edg|OPR|Brave/i.test(ua);
+    if (isAndroid && isChrome) {
+        showToast('请点击浏览器右上角 ⋮ 菜单，选择「安装应用」或「添加到主屏幕」');
+    } else if (isIOS) {
+        showToast('请点击Safari底部分享按钮 ⬆️，选择「添加到主屏幕」');
+    } else {
+        showToast('请点击浏览器地址栏右侧的安装图标 📥，或通过菜单「安装小本本」');
+    }
 }
 
-window.addEventListener('appinstalled', function() {
-    showToast('小本本已安装成功 🎉');
-    var installBtn = document.getElementById('installBtn');
-    if (installBtn) installBtn.style.display = 'none';
-});
+// 页面加载完成后，如果3秒内还没收到beforeinstallprompt，显示手动安装按钮
+setTimeout(function() {
+    if (!deferredPrompt && installBtn && !window.matchMedia('(display-mode: standalone)').matches) {
+        // 检查是否已经安装
+        if (window.matchMedia('(display-mode: standalone)').matches) return;
+        // 检查是否在可安装的浏览器中
+        var isInstallableBrowser = /Chrome|Edg|Firefox|SamsungBrowser/i.test(navigator.userAgent) && !/iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isInstallableBrowser) {
+            installBtn.style.display = 'inline-flex';
+            installBtn.textContent = '📱 添加到桌面';
+        }
+    }
+}, 3000);
 
 // ====== Init ======
 updatePriorityDot();

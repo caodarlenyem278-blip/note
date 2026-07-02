@@ -1,12 +1,12 @@
-// 小本本 Service Worker – PWA 离线缓存
-const CACHE = "xiaobenben-v11";
+// 小本本 Service Worker – PWA 离线缓存 v12
+const CACHE = "xiaobenben-v12";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=11",
-  "./app.js?v=11",
-  "./sync.js?v=11",
-  "./manifest.json?v=11",
+  "./style.css?v=12",
+  "./app.js?v=12",
+  "./sync.js?v=12",
+  "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
 ];
@@ -14,10 +14,18 @@ const SHELL = [
 self.addEventListener("install", function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
-      return cache.addAll(SHELL);
+      return cache.addAll(SHELL).catch(function(err) {
+        console.log("Cache addAll failed:", err);
+        // 逐个缓存，失败的跳过
+        return Promise.all(SHELL.map(function(url) {
+          return cache.add(url).catch(function(e) {
+            console.log("Failed to cache:", url, e);
+          });
+        }));
+      });
     })
   );
-  self.skipWaiting(); // 立即激活新SW
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", function(e) {
@@ -28,24 +36,24 @@ self.addEventListener("activate", function(e) {
             .map(function(k) { return caches.delete(k); })
       );
     }).then(function() {
-      return self.clients.claim(); // 立即控制所有页面
+      return self.clients.claim();
     })
   );
 });
 
 self.addEventListener("fetch", function(e) {
-  // 跳过非 GET 请求、chrome-extension 请求
   if (e.request.method !== "GET") return;
   var url = new URL(e.request.url);
   if (url.protocol === "chrome-extension:") return;
-  // 不同步 Supabase API 请求（总是走网络）
+  // 不同步 Supabase API 请求
   if (url.pathname.indexOf("/rest/v1/") !== -1) return;
+  // 跳过跨域请求
+  if (url.origin !== self.location.origin) return;
 
-  // 对带版本号的资源（?v=xx）使用network-first策略，确保最新
+  // 对版本化资源使用network-first
   var hasVersion = url.search.indexOf("v=") !== -1;
 
   if (hasVersion) {
-    // network-first for versioned resources
     e.respondWith(
       fetch(e.request).then(function(response) {
         if (response && response.status === 200) {
@@ -62,7 +70,27 @@ self.addEventListener("fetch", function(e) {
     return;
   }
 
-  // default: cache-first with network update
+  // 对manifest和icons使用stale-while-revalidate
+  var isStatic = /\.(png|jpg|jpeg|gif|svg|webp|ico|json|webmanifest)$/.test(url.pathname);
+  if (isStatic) {
+    e.respondWith(
+      caches.match(e.request).then(function(cached) {
+        var fetchPromise = fetch(e.request).then(function(response) {
+          if (response && response.status === 200) {
+            var clone = response.clone();
+            caches.open(CACHE).then(function(cache) {
+              cache.put(e.request, clone);
+            });
+          }
+          return response;
+        }).catch(function() { return cached; });
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // 默认: cache-first with network update
   e.respondWith(
     caches.match(e.request).then(function(cached) {
       var fetched = fetch(e.request).then(function(response) {
