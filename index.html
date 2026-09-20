@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
     <title>小本本 · 我的日常</title>
-    <link rel="stylesheet" href="style.css?v=19">
-    <link rel="manifest" href="manifest.json?v=19">
+    <link rel="stylesheet" href="style.css?v=20">
+    <link rel="manifest" href="manifest.json?v=20">
     <meta name="theme-color" content="#ffd400">
     <meta name="description" content="记录日常、待办与饮食的轻量日记应用">
     <meta name="mobile-web-app-capable" content="yes">
@@ -16,10 +16,10 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-TileColor" content="#ffd400">
     <meta name="msapplication-tap-highlight" content="no">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=19">
-    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=19">
-    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?v=19">
-    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png?v=19">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=20">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png?v=20">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png?v=20">
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png?v=20">
     <style>
         .loading .header-content h1, .loading .header-content .subtitle, .loading .search-bar-wrap { opacity: 0; }
     </style>
@@ -176,49 +176,38 @@
         <section class="panel" id="syncPanel">
             <div class="input-card">
                 <h3 class="section-title">⚡ 跨设备同步</h3>
-                <p class="section-desc">手机和电脑使用相同的 Supabase URL、Anon Key 和令牌即可实时同步</p>
+                <p class="section-desc">手机和电脑使用相同的 <strong>GitHub Token</strong> 和 <strong>Gist ID</strong> 实时同步（3 秒轮询）。Token 不会过期。</p>
                 <div id="syncForm">
                     <div class="form-group">
-                        <label>Supabase 项目 URL</label>
-                        <input type="text" id="syncUrl" placeholder="从 supabase.com 应用设置中获取">
+                        <label>GitHub Personal Access Token</label>
+                        <input type="password" id="syncToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx（需勾选 gist 权限）" autocomplete="off" spellcheck="false">
                     </div>
                     <div class="form-group">
-                        <label>Supabase anon key</label>
-                        <input type="text" id="syncAnonKey" placeholder="your anon/public key">
-                    </div>
-                    <div class="form-group">
-                        <label>同步令牌（自定义口令）</label>
-                        <input type="text" id="syncToken" placeholder="自定义口令，两台设备填入相同内容">
+                        <label>Gist ID</label>
+                        <input type="text" id="syncGistId" placeholder="32 位 ID，主设备创建后填入" autocomplete="off" spellcheck="false">
                     </div>
                     <div class="form-buttons">
+                        <button id="syncCreateBtn" class="btn btn-accent" title="用此 Token 自动创建一个私有 Gist 用于同步">📝 自动创建新 Gist</button>
                         <button id="syncConnectBtn" class="btn btn-primary">连接</button>
                         <button id="syncDisconnectBtn" class="btn btn-secondary">断开</button>
                     </div>
                     <div id="syncStatus" class="sync-status">
                         ⚪ 未连接
                     </div>
+                    <div id="syncGistInfo" class="sync-status" style="display:none;margin-top:8px"></div>
                 </div>
             </div>
             <div class="input-card setup-guide">
                 <div class="setup-toggle" onclick="toggleSetupGuide()">
-                    <span>📖 首次使用设置步骤</span>
+                    <span>📖 首次使用设置步骤（GitHub Gist 版）</span>
                     <span id="setupArrow">▶</span>
                 </div>
                 <div id="setupContent" style="display:none">
-                    <p>1. 打开 <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>，注册账号，创建项目</p>
-                    <p>2. 在项目 Settings → API 中获取 Project URL 和 anon/public key</p>
-                    <p>3. 在项目 SQL Editor 中运行下方 SQL 创建数据表</p>
-                    <p>4. 在本页面填入上述信息和你自定义的令牌，点击「连接」</p>
-                    <p>5. 手机和电脑都用相同令牌连接后，数据自动实时同步</p>
-                    <p class="sql-hint">所需 SQL（在 Supabase SQL Editor 中运行）：</p>
-                    <pre>CREATE TABLE sync_rooms (
-  token TEXT PRIMARY KEY,
-  data JSONB DEFAULT '{}'::jsonb,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE sync_rooms ENABLE ROW LEVEL SECURITY;
-CREATE POLICY anon_access ON sync_rooms
-  FOR ALL TO anon USING (true) WITH CHECK (true);</pre>
+                    <p><strong>第一步：创建永久 Token</strong>。打开 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → 选 <em>Tokens (classic)</em> → <em>Generate new token</em>。勾选 <code>gist</code> 权限，<strong>Expiration 选 No expiration</strong>，生成后把 <code>ghp_…</code> 开头的字符串复制下来。</p>
+                    <p><strong>第二步：主设备创建 Gist</strong>。在数据较多的一台设备（一般是手机）打开本页，填入 Token，点击「📝 自动创建新 Gist」。页面会出现一个 32 位 Gist ID，把它记下来。</p>
+                    <p><strong>第三步：另一台设备同步</strong>。在第二台设备填入相同的 Token 和 Gist ID，点击「连接」。系统会把 Gist 的最新数据拉下来，手机端的本地数据也会自动传上去（双向汇合）。</p>
+                    <p><strong>第四步：日常使用</strong>。两边都保持页面打开或偶尔打开一次即可，3 秒内自动双向同步。</p>
+                    <p class="tip" style="background:#fff8e1;border-left:3px solid #ffb300;padding:8px 10px;border-radius:4px;margin-top:8px">⚠️ <strong>安全提示</strong>：Token 等同于密码，请勿发给别人/截图上传。建议只勾选 <code>gist</code> 权限（不需要 <code>repo</code> 权限也能用本同步）。如果怀疑泄露，到 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">这里</a> 立刻 Revoke 并重生。</p>
                 </div>
             </div>
         </section>
@@ -234,10 +223,10 @@ CREATE POLICY anon_access ON sync_rooms
     </div>
     <div class="toast" id="toast"></div>
 
-    <script src="sync.js?v=19"></script>
-    <script src="app.js?v=19"></script>
+    <script src="sync.js?v=20"></script>
+    <script src="app.js?v=20"></script>
     <script>
-    // PWA Service Worker 注册 v19 - 稳定可靠版
+    // PWA Service Worker 注册 v20 - 切到 Gist 同步版
     (function() {
       if (!("serviceWorker" in navigator)) return;
       
@@ -258,7 +247,7 @@ CREATE POLICY anon_access ON sync_rooms
         }
         return Promise.all(cleanup);
       }).then(function() {
-        return navigator.serviceWorker.register("sw.js?v=19", { scope: "./" });
+        return navigator.serviceWorker.register("sw.js?v=20", { scope: "./" });
       }).then(function(reg) {
         console.log("[PWA] SW registered, scope:", reg.scope);
         console.log("[PWA] SW controller:", navigator.serviceWorker.controller ? "active" : "not yet active");

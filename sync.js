@@ -1,135 +1,219 @@
-// ====== 小本本 · 跨设备同步 (Supabase) ======
-// 使用 Supabase 免费版作为云数据库后端
-// 手机和电脑使用同一个 token 加入同一个"房间"
+// ====== 小本本 · 跨设备同步 (GitHub Gist) v20 ======
+// 实现：使用 GitHub Gist 作为云端存储后端
+//  - 一个 Private Gist 中的单文件 xiaobenben.json 存储全部数据
+//  - 3 秒轮询 fetch，对比 updated_at；推送使用 PATCH（自带 sha 乐观锁）
+//  - 文件 sha + 字符串对比避免无意义写入；时间戳格式由 GitHub 稳定返回
+//  - 替代之前 Supabase 实现，原因是 Supabase 的 updated_at 在毫秒 vs 微秒精度下会让前端永远匹配不上，导致 8/16 后同步静默失效
 
 (function() {
   "use strict";
 
-  var CONFIG_KEY = "xbbs_sync_config_v2";
+  var CONFIG_KEY = "xbbs_sync_gist_config_v1";
+  var GIST_FILENAME = "xiaobenben.json";
+  var API_BASE = "https://api.github.com";
+  var DEFAULT_DATA = '{"journals":[],"todos":[],"dones":[],"dietTarget":2000,"dietLogs":{}}';
 
   // ---- 内部状态 ----
-  var config = { url: "", anonKey: "", token: "" };
+  var config = { token: "", gistId: "" };
   var pollTimer = null;
   var onDataCallback = null;
-  var lastUpdatedAt = null;
   var isPushing = false;
+  var lastUpdatedAt = null;
+  var lastFileSha = null;
   var statusChangeHandler = function() {};
-  var currentStatus = "disconnected"; // disconnected | connecting | connected
+  var currentStatus = "disconnected";
 
-  // ---- 本地配置读写 ----
+  // ---- localStorage 读写 ----
   function loadConfig() {
     try {
       var raw = localStorage.getItem(CONFIG_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        if (parsed.url) config.url = parsed.url;
-        if (parsed.anonKey) config.anonKey = parsed.anonKey;
         if (parsed.token) config.token = parsed.token;
+        if (parsed.gistId) config.gistId = parsed.gistId;
       }
     } catch(e) {}
   }
 
   function saveConfig() {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    try { localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); } catch(e) {}
   }
 
-  // ---- 触发状态变化 ----
   function setStatus(s) {
-    if (currentStatus !== s) {
-      currentStatus = s;
-      statusChangeHandler();
-    }
+    if (currentStatus === s) return;
+    currentStatus = s;
+    try { statusChangeHandler(); } catch(e) {}
   }
 
-  // ---- 轮询：检查远端是否有新数据 ----
-  async function poll() {
-    if (!pollTimer || !onDataCallback) return;
-    try {
-      var res = await fetch(config.url + "/rest/v1/sync_rooms?token=eq." + encodeURIComponent(config.token) + "&select=data,updated_at&order=updated_at.desc&limit=1", {
-        headers: {
-          "apikey": config.anonKey,
-          "Authorization": "Bearer " + config.anonKey
-        }
-      });
-      if (!res.ok) return;
-      var records = await res.json();
-      if (records.length === 0) return;
+  // ---- 网络工具 ----
+  function ghHeaders(extra) {
+    var h = {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer " + config.token,
+      "X-GitHub-Api-Version": "2022-11-28"
+    };
+    if (extra) for (var k in extra) h[k] = extra[k];
+    return h;
+  }
 
-      var record = records[0];
-      var newTime = record.updated_at;
-      if (newTime !== lastUpdatedAt && !isPushing && record.data) {
+  function explainStatus(res) {
+    if (res.status === 401) return "Token 无效或已过期（HTTP 401）。请到 https://github.com/settings/tokens 检查";
+    if (res.status === 403) return "权限不足或速率受限（HTTP 403）。Token 需要勾选 gist 权限";
+    if (res.status === 404) return "找不到该 Gist（HTTP 404）。请检查 Gist ID 是否正确";
+    return "HTTP " + res.status;
+  }
+
+  // ---- Gist 操作 ----
+  async function fetchGist() {
+    var res = await fetch(API_BASE + "/gists/" + encodeURIComponent(config.gistId), {
+      headers: ghHeaders()
+    });
+    if (!res.ok) throw new Error("拉取 Gist 失败：" + explainStatus(res));
+    return res.json();
+  }
+
+  async function patchGistContent(jsonStr) {
+    // 先 GET 拿最新 sha
+    var cur = await fetchGist();
+    var filesObj = {};
+    filesObj[GIST_FILENAME] = { content: jsonStr };
+    var patchRes = await fetch(API_BASE + "/gists/" + encodeURIComponent(config.gistId), {
+      method: "PATCH",
+      headers: ghHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ files: filesObj })
+    });
+    if (!patchRes.ok) throw new Error("推送 Gist 失败：" + explainStatus(patchRes));
+    return patchRes.json();
+  }
+
+  async function createNewGist(token) {
+    var tmpToken = config.token;
+    config.token = (token || "").trim();
+    var filesObj = {};
+    filesObj[GIST_FILENAME] = { content: DEFAULT_DATA };
+    var res = await fetch(API_BASE + "/gists", {
+      method: "POST",
+      headers: ghHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        description: "小本本 · 我的日常 (xiaobenben) 同步数据（请勿手动删除）",
+        public: false,
+        files: filesObj
+      })
+    });
+    if (!res.ok) {
+      config.token = tmpToken;
+      throw new Error("创建 Gist 失败：" + explainStatus(res));
+    }
+    var gist = await res.json();
+    config.gistId = gist.id;
+    saveConfig();
+    return gist;
+  }
+
+  // ---- 轮询 ----
+  async function poll() {
+    if (!pollTimer) return;
+    if (isPushing) return;
+    if (!config.token || !config.gistId) return;
+    try {
+      var cur = await fetchGist();
+      var file = cur.files ? cur.files[GIST_FILENAME] : null;
+      if (!file) return;
+      var newTime = cur.updated_at;
+      if (newTime !== lastUpdatedAt && file.content) {
+        var parsed = null;
+        try { parsed = JSON.parse(file.content); } catch(e) { return; }
         lastUpdatedAt = newTime;
-        onDataCallback(record.data);
+        lastFileSha = file.sha;
+        if (onDataCallback) onDataCallback(parsed);
+      } else {
+        // 即使没有变化，也更新时间戳，避免失同步
+        lastUpdatedAt = newTime;
+        lastFileSha = file.sha;
       }
-    } catch(e) { /* silent */ }
+    } catch(e) {
+      console.warn("[sync] 轮询失败:", e.message);
+    }
   }
 
   // ---- 公开 API ----
   window.Sync = {
+    /** 当前配置（脱敏后仅返回 gistId 和 token 是否存在） */
     getConfig: function() {
-      return { url: config.url, anonKey: config.anonKey, token: config.token };
+      return {
+        token: config.token,
+        gistId: config.gistId,
+        hasToken: !!config.token,
+        hasGistId: !!config.gistId
+      };
     },
 
-    saveConfig: function(url, anonKey, token) {
-      config.url = url.trim().replace(/\/+$/, "").replace(/\/rest\/v1$/i, "");
-      config.anonKey = anonKey.trim();
-      config.token = token.trim();
+    saveConfig: function(token, gistId) {
+      config.token = (token || "").trim();
+      config.gistId = (gistId || "").trim();
       saveConfig();
     },
 
-    getStatus: function() {
-      return currentStatus;
+    getStatus: function() { return currentStatus; },
+
+    /** 用一个 PAT 自动创建一个 private Gist，作为同步空间 */
+    createGist: async function(token) {
+      return await createNewGist(token);
     },
 
-    connect: async function() {
-      if (!config.url || !config.anonKey || !config.token) {
-        throw new Error("请先填写 Supabase URL、Anon Key 和同步令牌");
-      }
+    /**
+     * 连接同步。如果 gist 已有数据会立即下发到本地。
+     * @param {object} data 当前可选传入本地数据，若提供则连接成功后立即推送一次（首次迁移用）
+     */
+    connect: async function(data) {
+      if (!config.token) throw new Error("请先填写 GitHub Personal Access Token");
+      if (!config.gistId) throw new Error("请先填写 Gist ID，或点击「📝 自动创建新 Gist」生成");
 
-      // 先断开
       this.disconnect();
       setStatus("connecting");
 
       try {
-        // 尝试拉取已有数据
-        var res = await fetch(config.url + "/rest/v1/sync_rooms?token=eq." + encodeURIComponent(config.token) + "&select=data,updated_at&order=updated_at.desc&limit=1", {
-          headers: {
-            "apikey": config.anonKey,
-            "Authorization": "Bearer " + config.anonKey
-          }
-        });
+        // 拉取 Gist
+        var cur = await fetchGist();
+        var file = cur.files ? cur.files[GIST_FILENAME] : null;
 
-        if (!res.ok) {
-          var errText = await res.text().catch(function(){ return ""; });
-          setStatus("disconnected");
-          throw new Error("连接失败 (HTTP " + res.status + "): " + (errText || "请检查 URL 和 Key 是否正确"));
+        // 如果 Gist 中没有数据文件，初始化
+        if (!file) {
+          var filesObj = {};
+          filesObj[GIST_FILENAME] = { content: DEFAULT_DATA };
+          var initRes = await fetch(API_BASE + "/gists/" + encodeURIComponent(config.gistId), {
+            method: "PATCH",
+            headers: ghHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ files: filesObj })
+          });
+          if (!initRes.ok) throw new Error("初始化 Gist 文件失败：" + explainStatus(initRes));
+          cur = await initRes.json();
+          file = cur.files[GIST_FILENAME];
         }
 
-        var records = await res.json();
-        if (records.length > 0 && records[0].data && onDataCallback) {
-          lastUpdatedAt = records[0].updated_at;
-          onDataCallback(records[0].data);
-        } else if (records.length === 0) {
-          // 房间不存在，尝试初始化
-          try {
-            await fetch(config.url + "/rest/v1/sync_rooms", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "apikey": config.anonKey,
-                "Authorization": "Bearer " + config.anonKey,
-                "Prefer": "resolution=merge-duplicates"
-              },
-              body: JSON.stringify({
-                token: config.token,
-                data: {},
-                updated_at: new Date().toISOString()
-              })
-            });
-          } catch(e) { /* ignore */ }
+        lastUpdatedAt = cur.updated_at;
+        lastFileSha = file.sha;
+
+        // 判断 gist 是不是空的默认数据
+        var parsed = null;
+        try { parsed = JSON.parse(file.content); } catch(e) {}
+        var isGistEmpty = !parsed ||
+          (Array.isArray(parsed.journals) && parsed.journals.length === 0 &&
+           Array.isArray(parsed.todos) && parsed.todos.length === 0 &&
+           Array.isArray(parsed.dones) && parsed.dones.length === 0 &&
+           (!parsed.dietLogs || Object.keys(parsed.dietLogs).length === 0));
+
+        // 1) 如果传入了本地数据且 gist 为空 → 立即把本地数据推上去（首次迁移）
+        if (data && isGistEmpty) {
+          await this.push(data);
         }
 
-        // 开始轮询（每 3 秒检查）
+        // 2) 如果 gist 有内容，下发到本地
+        if (!isGistEmpty && onDataCallback) {
+          onDataCallback(parsed);
+        }
+
+        // 启动 3 秒轮询
         pollTimer = setInterval(poll, 3000);
         setStatus("connected");
         return true;
@@ -140,60 +224,39 @@
     },
 
     disconnect: function() {
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       lastUpdatedAt = null;
+      lastFileSha = null;
       setStatus("disconnected");
     },
 
     push: async function(data) {
-      if (!pollTimer) return;
+      if (!config.token || !config.gistId) return;
+      if (!data) return;
       isPushing = true;
-
       try {
-        var now = new Date().toISOString();
-        var res = await fetch(config.url + "/rest/v1/sync_rooms?on_conflict=token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": config.anonKey,
-            "Authorization": "Bearer " + config.anonKey,
-            "Prefer": "resolution=merge-duplicates"
-          },
-          body: JSON.stringify({
-            token: config.token,
-            data: data,
-            updated_at: now
-          })
-        });
-
-        if (res.ok) {
-          lastUpdatedAt = now;
+        var json = JSON.stringify(data, null, 2);
+        var patched = await patchGistContent(json);
+        lastUpdatedAt = patched.updated_at;
+        if (patched.files && patched.files[GIST_FILENAME]) {
+          lastFileSha = patched.files[GIST_FILENAME].sha;
         }
       } catch(e) {
-        console.warn("同步推送失败:", e);
+        console.warn("[sync] 推送失败:", e.message);
       }
-
       isPushing = false;
     },
 
-    onData: function(callback) {
-      onDataCallback = callback;
-    },
+    onData: function(cb) { onDataCallback = cb; },
 
-    onStatusChange: function(fn) {
-      statusChangeHandler = fn;
-    },
+    onStatusChange: function(fn) { statusChangeHandler = fn; },
 
     clearConfig: function() {
-      config = { url: "", anonKey: "", token: "" };
-      localStorage.removeItem(CONFIG_KEY);
+      config = { token: "", gistId: "" };
+      try { localStorage.removeItem(CONFIG_KEY); } catch(e) {}
       this.disconnect();
     }
   };
 
-  // 启动时加载已保存的配置
   loadConfig();
 })();

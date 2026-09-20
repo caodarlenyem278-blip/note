@@ -699,8 +699,9 @@ if (typeof Sync !== 'undefined') {
     showToast("已同步 📡");
   });
   var savedCfg = Sync.getConfig();
-  if (savedCfg.url && savedCfg.anonKey && savedCfg.token) {
-    Sync.connect().catch(function(err) { console.warn('自动同步连接失败:', err.message); });
+  if (savedCfg.hasToken && savedCfg.hasGistId) {
+    // 自动连接（首次迁移时如果本地有数据会自动推送）
+    Sync.connect(data).catch(function(err) { console.warn('自动同步连接失败:', err.message); });
   }
 }
 
@@ -708,31 +709,73 @@ if (typeof Sync !== 'undefined') {
   if (typeof Sync === 'undefined') return;
   var $ = function(id) { return document.getElementById(id); };
   var cfg = Sync.getConfig();
-  if (cfg.url && $('syncUrl')) $('syncUrl').value = cfg.url;
-  if (cfg.anonKey && $('syncAnonKey')) $('syncAnonKey').value = cfg.anonKey;
   if (cfg.token && $('syncToken')) $('syncToken').value = cfg.token;
+  if (cfg.gistId && $('syncGistId')) $('syncGistId').value = cfg.gistId;
   function updateSyncUI() {
     var statusEl = $('syncStatus'); if (!statusEl) return;
+    var infoEl = $('syncGistInfo');
+    var cfgNow = Sync.getConfig();
     switch (Sync.getStatus()) {
-      case 'connected': statusEl.innerHTML = '🟢 已连接 · 实时同步中'; statusEl.className = 'sync-status connected'; break;
-      case 'connecting': statusEl.innerHTML = '🟡 连接中...'; statusEl.className = 'sync-status connecting'; break;
-      default: statusEl.innerHTML = '⚪ 未连接'; statusEl.className = 'sync-status';
+      case 'connected':
+        statusEl.innerHTML = '🟢 已连接 · 实时同步中';
+        statusEl.className = 'sync-status connected';
+        if (infoEl && cfgNow.gistId) {
+          infoEl.style.display = 'block';
+          infoEl.innerHTML = '📎 当前 Gist ID：<code style="background:#f4f4f4;padding:2px 4px;border-radius:3px">' + cfgNow.gistId + '</code>';
+        }
+        break;
+      case 'connecting':
+        statusEl.innerHTML = '🟡 连接中...';
+        statusEl.className = 'sync-status connecting';
+        break;
+      default:
+        statusEl.innerHTML = '⚪ 未连接';
+        statusEl.className = 'sync-status';
     }
   }
   Sync.onStatusChange(updateSyncUI);
   var connectBtn = $('syncConnectBtn');
   if (connectBtn) {
     connectBtn.addEventListener('click', async function() {
-      var url = $('syncUrl').value.trim(), anonKey = $('syncAnonKey').value.trim(), token = $('syncToken').value.trim();
-      if (!url || !anonKey || !token) { showToast('请填写所有字段'); return; }
-      Sync.saveConfig(url, anonKey, token);
-      try { await Sync.connect(); showToast('同步连接成功 🎉'); }
-      catch(e) { showToast('连接失败：' + e.message); }
+      var token = $('syncToken').value.trim();
+      var gistId = $('syncGistId').value.trim();
+      if (!token) { showToast('请填写 GitHub Token'); return; }
+      if (!gistId) { showToast('请填写 Gist ID，或点「自动创建新 Gist」'); return; }
+      Sync.saveConfig(token, gistId);
+      try {
+        await Sync.connect(data);
+        showToast('同步连接成功 🎉');
+      } catch(e) {
+        showToast('连接失败：' + e.message);
+      }
     });
   }
   var disconnectBtn = $('syncDisconnectBtn');
   if (disconnectBtn) {
-    disconnectBtn.addEventListener('click', async function() { await Sync.disconnect(); showToast('已断开同步'); });
+    disconnectBtn.addEventListener('click', async function() {
+      await Sync.disconnect();
+      showToast('已断开同步');
+    });
+  }
+  var createBtn = $('syncCreateBtn');
+  if (createBtn) {
+    createBtn.addEventListener('click', async function() {
+      var token = $('syncToken').value.trim();
+      if (!token) { showToast('请先填写 Token'); return; }
+      createBtn.disabled = true;
+      var oldText = createBtn.textContent;
+      createBtn.textContent = '创建中...';
+      try {
+        var gist = await Sync.createGist(token);
+        $('syncGistId').value = gist.id;
+        Sync.saveConfig(token, gist.id);
+        showToast('已创建 Gist：' + gist.id + '（已自动填入）');
+      } catch(e) {
+        showToast('创建失败：' + e.message);
+      }
+      createBtn.disabled = false;
+      createBtn.textContent = oldText;
+    });
   }
   updateSyncUI();
 })();

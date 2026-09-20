@@ -1,16 +1,16 @@
 // 小本本 Service Worker v19 - stable offline cache
-const CACHE = "xiaobenben-v19";
+const CACHE = "xiaobenben-v20";
 const SHELL = [
   "./",
   "./index.html",
-  "./style.css?v=19",
-  "./app.js?v=19",
-  "./sync.js?v=19",
-  "./manifest.json?v=19",
-  "./icon-192.png?v=19",
-  "./icon-512.png?v=19",
-  "./icon-maskable-192.png?v=19",
-  "./icon-maskable-512.png?v=19"
+  "./style.css?v=20",
+  "./app.js?v=20",
+  "./sync.js?v=20",
+  "./manifest.json?v=20",
+  "./icon-192.png?v=20",
+  "./icon-512.png?v=20",
+  "./icon-maskable-192.png?v=20",
+  "./icon-maskable-512.png?v=20"
 ];
 
 self.addEventListener("install", function(e) {
